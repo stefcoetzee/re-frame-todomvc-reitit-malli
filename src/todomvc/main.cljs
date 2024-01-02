@@ -1,10 +1,15 @@
 (ns todomvc.main
   (:require [clojure.string :as str]
             [clojure.pprint :refer [pprint]]
-            [reagent.core :as r]
-            [reagent.dom.client :as rdc]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]
+            [reagent.core :as r]
+            [reagent.dom.client :as rdc]
+            [reitit.core :as reit-c]
+            [reitit.coercion :as coercion]
+            [reitit.coercion.malli :as reit-cm]
+            [reitit.frontend :as reit-f]
+            [reitit.frontend.easy :as reit-fe]
             ["id128" :as id128]))
 
 ;; Utilities
@@ -148,9 +153,8 @@
   (let [[active done] @(rf/subscribe [:footer-counts])
         showing       @(rf/subscribe [:showing])
         a-fn          (fn [filter-kw text]
-                        [:a {:class    (when (= filter-kw showing) "selected")
-                             :on-click #(rf/dispatch [:set-showing filter-kw])
-                             #_#_:href     (str "#/" (name filter-kw))}
+                        [:a {:class    (when (= filter-kw showing) "selected") 
+                             :href     (str "/" (name filter-kw))}
                          text])]
     [:footer#footer
      [:span#todo-count
@@ -232,11 +236,27 @@
                        (map :id))]
      (assoc db :todos (reduce dissoc todos done-ids)))))
 
-(comment 
+;; Routing
 
-  :rcf)
+(def routes
+  ["/"
+   [""]
+   [":filter"
+    {:parameters {:path [:map [:filter keyword?]]}}]])
 
-;; Basic Reagent setup
+(def router (reit-f/router routes {:data {:coercion reit-cm/coercion}}))
+
+(defn on-navigate [match _]
+  (let [coerced (coercion/coerce! match)]
+    (if (not (nil? coerced))
+      (rf/dispatch [:set-showing (-> coerced :path :filter)])
+      (rf/dispatch [:set-showing :all]))))
+
+(defn init-routes! []
+  (js/console.log "Initializing routes")
+  (reit-fe/start! router on-navigate {:use-fragment false}))
+
+;; Reagent and development setup
 
   (def functional-compiler (r/create-compiler {:function-components true}))
 
@@ -259,4 +279,5 @@
   (defn ^:export init! []
     (js/console.log "Initialize")
     (rf/dispatch-sync [:initialize-db])
+    (init-routes!)
     (start!))

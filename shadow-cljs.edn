@@ -1,7 +1,9 @@
 {:dependencies [[org.slf4j/slf4j-nop "2.0.3"]
                 [binaryage/devtools "1.0.7"]
                 [reagent "1.2.0"]
-                [re-frame "1.4.2"]]
+                [re-frame "1.4.2"]
+                [metosin/reitit "0.7.0-alpha7"]
+                [metosin/malli "0.13.0"]]
  
  :dev-http {8000 "resources/public"}
  
