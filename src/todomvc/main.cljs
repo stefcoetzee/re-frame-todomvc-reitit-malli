@@ -1,7 +1,10 @@
 (ns todomvc.main
   (:require [clojure.string :as str]
             [clojure.pprint :refer [pprint]]
+            [malli.core :as m]
+            [malli.error :as me]
             [re-frame.core :as rf]
+            [re-frame.alpha :as rfa]
             [re-frame.db :refer [app-db]]
             [reagent.core :as r]
             [reagent.dom.client :as rdc]
@@ -15,17 +18,38 @@
 ;; Utilities
 
 (defn ulid
-  "Returns a UUID-formatted ULID."
+  "Returns a UUID-formatted [ULID](https://github.com/ulid/spec)."
   []
   (let [ulid (str/lower-case (.toRaw (id128/UlidMonotonic.generate)))
-        a (subs ulid 0 8)
-        b (subs ulid 8 12)
-        c (subs ulid 12 16)
-        d (subs ulid 16 20)
-        e (subs ulid 20 32)]
+        a    (subs ulid 0 8)
+        b    (subs ulid 8 12)
+        c    (subs ulid 12 16)
+        d    (subs ulid 16 20)
+        e    (subs ulid 20 32)]
     (uuid (str/join "-" [a b c d e]))))
 
+(defn check-and-throw
+  "Throws an exception if `db` does not match `schema`."
+  [schema db]
+  (when-not (m/validate schema db)
+    (throw
+     (ex-info (str "Schema check failed: " (me/humanize (m/explain schema db)))
+              {}))))
+
+(defn valid? [schema]
+  (m/validator schema))
+
 ;; App database (data layer)
+
+(def db-schema
+  [:map 
+   [:showing keyword?]
+   [:todos [:map-of
+            :uuid
+            [:map
+             [:id uuid?]
+             [:title string?]
+             [:done boolean?]]]]])
 
 (def default-db {:todos   (sorted-map)
                  :showing :all})
@@ -178,11 +202,21 @@
    [:footer#info
     [:p "Double click to edit a todo"]]])
 
-;; Events (control/update layer)
+;; Control/update layer: event interceptors and events
+
+;; Event interceptors
+
+(def check-schema-interceptor (rfa/after (partial check-and-throw db-schema)))
+
+(def todo-interceptors [check-schema-interceptor
+                        (rfa/path :todos)])
+
+;; Events
 
 (rf/reg-event-fx
  :initialize-db
- (fn [{:keys [db]}]
+ [check-schema-interceptor]
+ (fn [_ _]
    {:db (assoc default-db
                :todos
                (let [item-1-id (ulid)
@@ -192,34 +226,38 @@
 
 (rf/reg-event-db
  :toggle-done
- (fn [db [_ id]]
-   (update-in db [:todos id :done] not)))
+ todo-interceptors
+ (fn [todos [_ id]]
+   (update-in todos [id :done] not)))
 
 
 (rf/reg-event-db
  :create-todo
- (fn [db [_ title]]
+ todo-interceptors
+ (fn [todos [_ title]]
    (let [id (ulid)]
-     (assoc-in db [:todos id] {:id id :title title :done false}))))
+     (assoc todos id {:id id :title title :done false}))))
 
 (rf/reg-event-db
  :update-todo
- (fn [db [_ id title]]
-   (assoc-in db [:todos id :title] title)))
+ todo-interceptors
+ (fn [todos [_ id title]]
+   (assoc-in todos [id :title] title)))
 
 (rf/reg-event-db
  :delete-todo
- (fn [db [_ id]]
-   (update-in db [:todos] dissoc id)))
+ todo-interceptors
+ (fn [todos [_ id]]
+   (dissoc todos id)))
 
 (rf/reg-event-db
  :complete-all-toggle
- (fn [db _]
-   (let [todos      (:todos db)
-         new-status (not-every? :done (vals todos))]
-     (reduce (fn [db t-id]
-               (assoc-in db [:todos t-id :done] new-status))
-             db
+ todo-interceptors
+ (fn [todos _]
+   (let [new-status (not-every? :done (vals todos))]
+     (reduce (fn [tasks t-id]
+               (assoc-in tasks [t-id :done] new-status))
+             todos
              (keys todos)))))
 
 (rf/reg-event-db
