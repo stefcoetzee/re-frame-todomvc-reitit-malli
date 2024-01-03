@@ -41,15 +41,23 @@
 
 ;; App database (data layer)
 
+(comment
+
+  @app-db
+
+  :rcf)
+
 (def db-schema
   [:map 
    [:showing keyword?]
-   [:todos [:map-of
-            :uuid
-            [:map
-             [:id uuid?]
-             [:title string?]
-             [:done boolean?]]]]])
+   [:todos [:or
+            [:map {:closed true}]
+            [:map-of
+             :uuid
+             [:map
+              [:id uuid?]
+              [:title string?]
+              [:done boolean?]]]]]])
 
 (def default-db {:todos   (sorted-map)
                  :showing :all
@@ -274,17 +282,26 @@
 
 (rf/reg-event-db
  :set-showing
+ [check-schema-interceptor]
  (fn [db [_ new-filter-criteria]]
    (assoc db :showing new-filter-criteria)))
 
+(comment
+
+  (m/validate (m/schema :uuid) #uuid "018cd0d8-9d46-5b3a-9198-b15e46b3580b")
+
+  (uuid? #uuid "018cd0d8-9d46-5b3a-9198-b15e46b3580b")
+
+  :rcf)
+
 (rf/reg-event-db
  :clear-completed
- (fn [db _]
-   (let [todos    (:todos db)
-         done-ids (->> (vals todos)
+ todo-interceptors
+ (fn [todos _]
+   (let [done-ids (->> (vals todos)
                        (filter :done)
                        (map :id))]
-     (assoc db :todos (reduce dissoc todos done-ids)))))
+     (reduce dissoc todos done-ids))))
 
 (rf/reg-event-db
  :toggle-alpha
