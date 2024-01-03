@@ -52,7 +52,8 @@
              [:done boolean?]]]]])
 
 (def default-db {:todos   (sorted-map)
-                 :showing :all})
+                 :showing :all
+                 :very    {:long {:path {:alpha? false}}}})
 
 ;; Subscriptions (query layer)
 
@@ -109,6 +110,10 @@
  :<- [:completed-count]
  (fn [[todos completed] _]
    [(- (count todos) completed) completed]))
+
+(rfa/reg :sub
+         :alpha? 
+         :-> (comp :alpha? :path :long :very))
 
 ;; View components (view layer)
 
@@ -177,8 +182,8 @@
   (let [[active done] @(rf/subscribe [:footer-counts])
         showing       @(rf/subscribe [:showing])
         a-fn          (fn [filter-kw text]
-                        [:a {:class    (when (= filter-kw showing) "selected") 
-                             :href     (str "/" (name filter-kw))}
+                        [:a {:class (when (= filter-kw showing) "selected") 
+                             :href  (str "/" (name filter-kw))}
                          text])]
     [:footer#footer
      [:span#todo-count
@@ -191,9 +196,16 @@
        [:button#clear-completed {:on-click #(rf/dispatch [:clear-completed])}
         "Clear completed"])]))
 
+(defn alpha []
+  (let [alpha? @(rf/subscribe [:alpha?])]
+    [:a {:href     "#"
+         :style    {:color (if alpha? "blue" "gray")}
+         :on-click #(rf/dispatch [:toggle-alpha])}
+     (str "`re-frame.alpha/sub` instance value: " (if alpha? "`true`" "`false`"))]))
+
 (defn todo-app []
   [:<>
-   #_[alpha]
+   [alpha]
    [:section#todoapp
     [task-entry]
     (when (seq @(rf/subscribe [:todos]))
@@ -273,6 +285,11 @@
                        (filter :done)
                        (map :id))]
      (assoc db :todos (reduce dissoc todos done-ids)))))
+
+(rf/reg-event-db
+ :toggle-alpha
+ (fn [db _]
+   (update-in db [:very :long :path :alpha?] not)))
 
 ;; Routing
 
