@@ -51,7 +51,7 @@
 
 (def db-schema
   [:map 
-   [:showing keyword?]
+   [:showing [:enum :all :done :active]]
    [:todos [:map-of
             :uuid
             [:map
