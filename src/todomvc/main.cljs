@@ -1,6 +1,7 @@
 (ns todomvc.main
   (:require [clojure.string :as str]
             [clojure.pprint :refer [pprint]]
+            [cljs.reader :as rdr]
             [malli.core :as m]
             [malli.error :as me]
             [re-frame.core :as rf]
@@ -39,13 +40,14 @@
 (defn valid? [schema]
   (m/validator schema))
 
+(def ls-key "rf-todos")
+
+(defn todos->local-store
+  "Stores `todos` in localStorage"
+  [todos]
+  (js/localStorage.setItem ls-key (str todos)))
+
 ;; App database (data layer)
-
-(comment
-
-  @app-db
-
-  :rcf)
 
 (def db-schema
   [:map 
@@ -211,7 +213,7 @@
 
 (defn todo-app []
   [:<>
-   [alpha]
+   #_[alpha] ;; Uncomment to display
    [:section#todoapp
     [task-entry]
     (when (seq @(rf/subscribe [:todos]))
@@ -226,21 +228,22 @@
 
 (def check-schema-interceptor (rfa/after (partial check-and-throw db-schema)))
 
+(def ->local-store (rfa/after todos->local-store))
+
 (def todo-interceptors [check-schema-interceptor
-                        (rfa/path :todos)])
+                        (rfa/path :todos)
+                        ->local-store])
 
 ;; Events
 
 (rf/reg-event-fx
  :initialize-db
- [check-schema-interceptor]
- (fn [_ _]
+ [(rf/inject-cofx :local-store-todos)
+  check-schema-interceptor]
+ (fn [{:keys [ls-todos]} _]
    {:db (assoc default-db
                :todos
-               (let [item-1-id (ulid)
-                     item-2-id (ulid)]
-                 {item-1-id {:id item-1-id :title "Foo" :done false}
-                  item-2-id {:id item-2-id :title "Bar" :done true}}))}))
+               ls-todos)}))
 
 (rf/reg-event-db
  :toggle-done
@@ -284,14 +287,6 @@
  (fn [db [_ new-filter-criteria]]
    (assoc db :showing new-filter-criteria)))
 
-(comment
-
-  (m/validate (m/schema :uuid) #uuid "018cd0d8-9d46-5b3a-9198-b15e46b3580b")
-
-  (uuid? #uuid "018cd0d8-9d46-5b3a-9198-b15e46b3580b")
-
-  :rcf)
-
 (rf/reg-event-db
  :clear-completed
  todo-interceptors
@@ -305,6 +300,17 @@
  :toggle-alpha
  (fn [db _]
    (update-in db [:very :long :path :alpha?] not)))
+
+;; Coeffects
+
+(rf/reg-cofx
+ :local-store-todos
+ (fn [coeffect _]
+   (assoc coeffect 
+          :ls-todos
+          (into (sorted-map)
+                (some->> (js/localStorage.getItem ls-key)
+                         (rdr/read-string))))))
 
 ;; Routing
 
