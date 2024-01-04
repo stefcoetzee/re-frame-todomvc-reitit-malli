@@ -14,6 +14,12 @@ and
 [`clojure.spec`](https://clojure.org/about/spec),
 respectively).
 
+Furthermore,
+this implementation makes use of 
+[ULIDs](https://github.com/ulid/spec)
+as todo IDs,
+as opposed to integer IDs.
+
 Note that, 
 as mentioned in the reference codebase linked above,
 the re-frame TodoMVC application is not a minimal implementation.
