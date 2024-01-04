@@ -50,14 +50,12 @@
 (def db-schema
   [:map 
    [:showing keyword?]
-   [:todos [:or
-            [:map {:closed true}]
-            [:map-of
-             :uuid
-             [:map
-              [:id uuid?]
-              [:title string?]
-              [:done boolean?]]]]]])
+   [:todos [:map-of
+            :uuid
+            [:map
+             [:id uuid?]
+             [:title string?]
+             [:done boolean?]]]]])
 
 (def default-db {:todos   (sorted-map)
                  :showing :all
