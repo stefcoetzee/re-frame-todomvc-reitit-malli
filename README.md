@@ -20,11 +20,12 @@ this implementation makes use of
 as todo IDs,
 as opposed to integer IDs.
 
-Note that, 
-as mentioned in the reference codebase linked above,
+As mentioned in the reference codebase linked above,
 the re-frame TodoMVC application is not a minimal implementation.
 Instead,
 it is meant to be something of a showcase of re-frame functionality.
+
+Recent versions of Node and Clojure are required.
 
 ## Explore the implementation
 
